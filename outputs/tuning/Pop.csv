@@ -1,0 +1,2 @@
+valid_recall@10,valid_mrr@10,valid_ndcg@10,valid_hit@10,valid_precision@10,seconds
+0.0831,0.1781,0.0932,0.4602,0.0742,0.4

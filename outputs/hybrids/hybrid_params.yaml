@@ -1,0 +1,63 @@
+Weighted:
+  C: 0.001
+  weights:
+    Pop: -0.09378548678619572
+    ItemKNN: 0.2059886461066459
+    UserKNN: 0.5520869219232105
+    BPR: 0.20031499172705547
+    FISM: -0.10420283009290933
+    SLIMElastic: 0.7708055033425643
+    EASE: 0.4716150683113009
+    LightGCN: 0.2385032461941437
+    NGCF: 0.27683290260091986
+    NeuMF: 0.3639980981154557
+Switching:
+  n_groups: 5
+  edges:
+  - 16.0
+  - 24.0
+  - 41.0
+  - 75.0
+  - 137.60000000000002
+  - 591.0
+  assignment:
+    0: LightGCN
+    1: SLIMElastic
+    2: SLIMElastic
+    3: EASE
+    4: EASE
+Mixed:
+  models:
+  - SLIMElastic
+  - EASE
+  - NGCF
+  - LightGCN
+  - BPR
+  c: 10
+Cascade:
+  stage1: NGCF
+  stage2: SLIMElastic
+  N: 50
+FeatureCombination:
+  features:
+  - log_item_pop
+  - item_avg_rating
+  - release_year
+  - log_user_activity
+  - user_avg_rating
+  - genre_affinity
+  - cf_item_similarity
+  - gender_group_pop
+  - occupation_group_pop
+  - age_group_pop
+  max_iter: 300
+  learning_rate: 0.05
+  max_leaf_nodes: 15
+FeatureAugmentation:
+  source: NGCF
+  n_pseudo: 10
+  alpha: 0.25
+  ease_reg_weight: 500.0
+MetaLevel:
+  k: 50
+  ease_reg_weight: 500.0

@@ -1,0 +1,5 @@
+n_groups,select_ndcg@10,assignment
+5,0.24859617538923276,"{0: 'BPR', 1: 'SLIMElastic', 2: 'SLIMElastic', 3: 'EASE', 4: 'EASE'}"
+4,0.24705621734708003,"{0: 'EASE', 1: 'SLIMElastic', 2: 'SLIMElastic', 3: 'EASE'}"
+3,0.2449929199590797,"{0: 'SLIMElastic', 1: 'SLIMElastic', 2: 'EASE'}"
+2,0.2425802374175927,"{0: 'SLIMElastic', 1: 'EASE'}"

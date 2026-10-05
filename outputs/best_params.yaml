@@ -1,0 +1,43 @@
+Random: {}
+Pop: {}
+ItemKNN:
+  k: 400
+  shrink: 10.0
+UserKNN:
+  k: 50
+  shrink: 0.0
+BPR:
+  epochs: 300
+  eval_step: 5
+  stopping_step: 4
+  embedding_size: 128
+  learning_rate: 0.001
+FISM:
+  epochs: 300
+  eval_step: 5
+  stopping_step: 4
+  embedding_size: 32
+  learning_rate: 0.005
+SLIMElastic:
+  alpha: 0.05
+  l1_ratio: 0.02
+EASE:
+  reg_weight: 500.0
+LightGCN:
+  epochs: 300
+  eval_step: 5
+  stopping_step: 4
+  n_layers: 3
+  learning_rate: 0.005
+NGCF:
+  epochs: 300
+  eval_step: 5
+  stopping_step: 4
+  learning_rate: 0.001
+  message_dropout: 0.1
+NeuMF:
+  epochs: 300
+  eval_step: 5
+  stopping_step: 4
+  learning_rate: 0.001
+  dropout_prob: 0.3

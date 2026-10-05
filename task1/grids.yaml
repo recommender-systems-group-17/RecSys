@@ -1,0 +1,59 @@
+# Task 1.2 hyperparameter grids. Every combination is trained and scored on
+# validation NDCG@10; the best one is written to outputs/best_params.yaml.
+# `fixed` is applied to every run of that model.
+# seed and eval_args are never changed, so the split is identical everywhere.
+#
+# Iterative models get up to 300 epochs with early stopping
+# (validation every 5 epochs, stop after 4 checks without improvement).
+
+Random: {}
+Pop: {}
+
+ItemKNN:
+  grid:
+    k: [20, 50, 100, 200, 400]
+    shrink: [0.0, 10.0, 100.0]
+
+UserKNN:
+  grid:
+    k: [20, 50, 100, 200, 400]
+    shrink: [0.0, 10.0, 100.0]
+
+SLIMElastic:
+  grid:
+    alpha: [0.05, 0.2, 0.5]
+    l1_ratio: [0.02, 0.1]
+
+EASE:
+  grid:
+    reg_weight: [50.0, 100.0, 250.0, 500.0, 1000.0, 2000.0]
+
+BPR:
+  fixed: {epochs: 300, eval_step: 5, stopping_step: 4}
+  grid:
+    embedding_size: [32, 64, 128]
+    learning_rate: [0.001, 0.005, 0.01]
+
+FISM:
+  fixed: {epochs: 300, eval_step: 5, stopping_step: 4}
+  grid:
+    embedding_size: [32, 64]
+    learning_rate: [0.001, 0.005]
+
+LightGCN:
+  fixed: {epochs: 300, eval_step: 5, stopping_step: 4}
+  grid:
+    n_layers: [1, 2, 3]
+    learning_rate: [0.001, 0.005]
+
+NGCF:
+  fixed: {epochs: 300, eval_step: 5, stopping_step: 4}
+  grid:
+    learning_rate: [0.001, 0.005]
+    message_dropout: [0.1, 0.3]
+
+NeuMF:
+  fixed: {epochs: 300, eval_step: 5, stopping_step: 4}
+  grid:
+    learning_rate: [0.001, 0.005]
+    dropout_prob: [0.1, 0.3]

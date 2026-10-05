@@ -2,7 +2,7 @@
 
 This repo is a copy of the course RecBole repo ([masoudmansoury/RecBole_DSAIT4335](https://github.com/masoudmansoury/RecBole_DSAIT4335)) plus our group's work. All experiments run on **MovieLens 100K** (already included in `dataset/ml-100k/`).
 
-The original RecBole README is in `README_RecBole.md`.
+The original RecBole README is in `README_RecBole.md`. Details on Task 1 are in `task1/README.md`.
 
 ---
 
@@ -37,17 +37,20 @@ pip install "numpy<2" "ray[tune]"
 | `np.float_ was removed in the NumPy 2.0 release` | NumPy 2 is installed. Run `pip install "numpy<2"`. |
 | `Can't import ray.tune` | Run `pip install "ray[tune]"`. |
 | `command line args [...] will not be used in RecBole` | Harmless. The config file is still applied. |
-| `FutureWarning` from pandas / torch | Harmless deprecation notices. |
+| `Could not save embeddings: BPR.forward() ...` | Harmless message from the course trainer. |
+| `FutureWarning` / `UserWarning` from pandas / torch | Harmless deprecation notices. |
 
 ---
 
 ## 2. Rules for consistent results
 
-1. **Do not change `seed` or `eval_args`** in any config file. They define the train/valid/test split, and every model must use the same split.
-2. **Use the shared split in `outputs/splits/`.** Don't regenerate it. Different library versions can produce a slightly different split even with the same seed.
-3. **Evaluate from the files in `outputs/`.** Models are trained on one machine and exported there, so everyone evaluates exactly the same recommendation lists. Don't use the metrics RecBole prints in the report; we implement our own (Task 2.1).
-4. **Pull before you start working:** `git pull`.
-5. **Work on your own branch** and merge into `main` through a pull request. `main` should always run.
+1. **Don't retrain models.** All models are trained and exported once, and everyone works from the files in `outputs/`.
+2. **Use the split in `outputs/splits/`.** This is the exact split every model was trained and tested on.
+3. **Never use `save_split.py` from the course repo.** It doesn't set the random seed, so it produces a *different* split on every run, and that split doesn't match the one the models were trained on.
+4. **Report numbers from the `test` lists only** (`outputs/recommendations/test/`). The validation lists of the learned hybrids are in-sample.
+5. **Don't use the metrics RecBole prints in the report.** We implement our own (Task 2.1).
+6. **Pull before you start working:** `git pull`.
+7. **Work on your own branch** and merge into `main` through a pull request. `main` should always run.
 
 ---
 
@@ -55,18 +58,32 @@ pip install "numpy<2" "ray[tune]"
 
 ```
 RecSys/
-├── setup.sh                   # one-time environment setup
-├── dataset/ml-100k/           # MovieLens 100K (.inter, .item, .user)
-├── recbole/config/<Model>/    # one config per model: ml-100k.yaml
-├── run_recbole.py             # train a model
-├── save_split.py              # export train/valid/test split
-├── save_recommendations.py    # export top-k recommendations of a trained model
-├── score_from_saved.py        # example evaluation (Recall/Precision/F1) from exported files
-├── outputs/                   # SHARED results, committed to git
-│   ├── splits/                #   ml-100k.{train,valid,test}.tsv
-│   └── recommendations/       #   ml-100k_<Model>_top<k>.json
-└── saved/                     # local checkpoints (.pth), NOT committed
+├── setup.sh                    one-time environment setup
+├── run_task1.sh                reproduces all of Task 1
+├── task1/                      Task 1 code (see task1/README.md)
+│   ├── individual.py           1.1–1.2: tune + train individual models
+│   ├── hybrids.py              1.3–1.5: 7 hybrid models
+│   ├── common.py               shared helpers
+│   └── grids.yaml              hyperparameter grids
+├── dataset/ml-100k/            MovieLens 100K (.inter, .item, .user)
+├── recbole/config/<Model>/     RecBole config per model
+├── outputs/                    SHARED results, committed to git
+│   ├── splits/                 ml-100k.{train,valid,test}.tsv
+│   ├── recommendations/
+│   │   ├── test/               ml-100k_<Model>_top100.json  ← use these
+│   │   └── valid/              ml-100k_<Model>_top100.json
+│   ├── tuning/                 every hyperparameter setting tried, per model
+│   ├── best_params.yaml        chosen hyperparameters per model
+│   ├── hybrids/                hybrid tuning, weights, coefficients
+│   └── task1_summary.csv       valid/test NDCG@10 of all 18 models
+├── cache/                      local score matrices, NOT committed
+└── saved/                      local checkpoints, NOT committed
 ```
+
+### Models in `outputs/recommendations/`
+
+- **Individual (11):** Random, Pop, ItemKNN, UserKNN, BPR, FISM, SLIMElastic, EASE, LightGCN, NGCF, NeuMF
+- **Hybrids (7):** Hybrid-Weighted, Hybrid-Switching, Hybrid-Mixed, Hybrid-Cascade, Hybrid-FeatureCombination, Hybrid-FeatureAugmentation, Hybrid-MetaLevel
 
 ---
 
@@ -81,12 +98,13 @@ user_id	item_id
 196	242
 ```
 
-### Recommendations: `outputs/recommendations/ml-100k_<Model>_top<k>.json`
+### Recommendations: `outputs/recommendations/{test,valid}/ml-100k_<Model>_top100.json`
 
 ```json
 {
   "dataset": "ml-100k",
-  "model": "Pop",
+  "model": "EASE",
+  "split": "test",
   "k": 100,
   "seed": 2020,
   "eval_args": {...},
@@ -97,9 +115,10 @@ user_id	item_id
 }
 ```
 
-- One entry per user in the test set, with items ranked best first.
-- Items the user already interacted with in train/valid are excluded.
+- One entry per user in that split, with items ranked best first (top 100).
+- Test lists exclude items the user had in train or valid. Validation lists exclude train items.
 - IDs are strings in the original MovieLens format, the same as in the split files.
+- Scores are on each model's own scale, so they can't be compared across models.
 
 ### Loading in Python
 
@@ -110,42 +129,24 @@ import pandas as pd
 test = pd.read_csv("outputs/splits/ml-100k.test.tsv", sep="\t", dtype=str)
 truth = test.groupby("user_id")["item_id"].apply(set).to_dict()
 
-with open("outputs/recommendations/ml-100k_Pop_top100.json") as f:
+with open("outputs/recommendations/test/ml-100k_EASE_top100.json") as f:
     recs = json.load(f)["recommendations"]
 
 top10 = {u: r["items"][:10] for u, r in recs.items()}
 ```
 
-Item metadata (genres, release date) for beyond-accuracy metrics is in `dataset/ml-100k/ml-100k.item`, and user metadata (age, gender, occupation) is in `dataset/ml-100k/ml-100k.user`.
+Item metadata (genres, release year) for beyond-accuracy metrics is in `dataset/ml-100k/ml-100k.item`, and user metadata (age, gender, occupation) is in `dataset/ml-100k/ml-100k.user`.
 
 ---
 
-## 5. Training and exporting a model (reference)
-
-Only needed if you are producing the shared outputs.
+## 5. Reproducing Task 1 (only if needed)
 
 ```bash
-# train
-python run_recbole.py --model BPR --dataset ml-100k \
-  --config_files recbole/config/BPR/ml-100k.yaml
-
-# export recommendations (use the checkpoint name printed by `ls saved/`)
-python save_recommendations.py \
-  --model_file saved/ml-100k-BPR-<timestamp>.pth \
-  --k 100 --output_dir outputs/recommendations
-
-# example evaluation
-python score_from_saved.py \
-  --test_tsv outputs/splits/ml-100k.test.tsv \
-  --rec_json outputs/recommendations/ml-100k_BPR_top100.json --k 10
+bash run_task1.sh --quick   # smoke test, a few minutes
+bash run_task1.sh           # full run, several hours on a laptop
 ```
 
-UserKNN is run as ItemKNN with the UserKNN config:
-
-```bash
-python run_recbole.py --model ItemKNN --dataset ml-100k \
-  --config_files recbole/config/UserKNN/ml-100k.yaml
-```
+If your machine produces a different split than the one in `outputs/splits/`, the script stops instead of overwriting results.
 
 ---
 
@@ -158,16 +159,13 @@ git pull upstream main
 git push
 ```
 
-Coordinate in the group chat before doing this, so only one person does it.
-
 ---
 
 ## 7. Status
 
 - [x] Environment setup (`setup.sh`)
-- [x] Shared split exported (`outputs/splits/`)
-- [x] Pop baseline exported
-- [ ] Individual models trained, tuned and exported
-- [ ] Hybrid models
-- [ ] Evaluation metrics (Task 2)
-- [ ] Rerankers (Task 3)
+- [x] Shared split (`outputs/splits/`)
+- [x] Task 1.1–1.2: 11 individual models trained, tuned and exported
+- [x] Task 1.3–1.5: 7 hybrid models built, tuned and exported
+- [ ] Task 2: evaluation metrics and analysis
+- [ ] Task 3: rerankers

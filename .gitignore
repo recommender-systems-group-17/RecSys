@@ -12,4 +12,6 @@ saved/
 *.egg-info/
 docs/build/
 wandb/*
-/ray_log*
+/ray_log*cache/
+cache/
+cache/
