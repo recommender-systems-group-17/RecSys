@@ -1,0 +1,4 @@
+strategy,NDCG
+best single member (EASE),0.3302
+oracle per activity group,0.3302
+oracle per user,0.4446
