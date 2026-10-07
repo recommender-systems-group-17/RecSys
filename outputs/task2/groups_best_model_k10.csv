@@ -1,0 +1,17 @@
+grouping,group,n_users,best_individual,best_individual_NDCG,EASE_NDCG,best_overall,best_overall_NDCG
+active,Active,189,EASE,0.5367,0.5367,Hybrid-FeatureAugmentation,0.5462
+active,Inactive,754,EASE,0.2784,0.2784,Hybrid-Weighted,0.2833
+activity,Q1 (16-24),201,EASE,0.2654,0.2654,Hybrid-Mixed,0.2708
+activity,Q2 (25-41),191,EASE,0.255,0.255,Hybrid-Weighted,0.2651
+activity,Q3 (42-75),175,EASE,0.2832,0.2832,Hybrid-FeatureAugmentation,0.2895
+activity,Q4 (76-137),187,EASE,0.3119,0.3119,Hybrid-Mixed,0.3206
+activity,Q5 (138-591),189,EASE,0.5367,0.5367,Hybrid-FeatureAugmentation,0.5462
+age_group,25-34,310,EASE,0.3375,0.3375,Hybrid-FeatureAugmentation,0.3395
+age_group,35-49,274,EASE,0.3224,0.3224,Hybrid-FeatureAugmentation,0.3291
+age_group,50+,125,EASE,0.2864,0.2864,Hybrid-Weighted,0.3014
+age_group,<25,234,SLIMElastic,0.3582,0.353,Hybrid-Weighted,0.3663
+gender,F,273,EASE,0.2992,0.2992,Hybrid-Weighted,0.3061
+gender,M,670,EASE,0.3428,0.3428,Hybrid-FeatureAugmentation,0.3501
+mainstream,Blockbuster,189,EASE,0.2725,0.2725,Hybrid-Mixed,0.2821
+mainstream,Diverse,565,EASE,0.3179,0.3179,Hybrid-Weighted,0.3227
+mainstream,Niche,189,EASE,0.4247,0.4247,Hybrid-Weighted,0.4323

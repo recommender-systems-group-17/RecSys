@@ -1,0 +1,11 @@
+,share_of_users_where_best
+EASE,0.1482
+SLIMElastic,0.1448
+BPR,0.1334
+NGCF,0.1311
+NeuMF,0.1026
+LightGCN,0.0981
+UserKNN,0.0924
+ItemKNN,0.0867
+FISM,0.0502
+Pop,0.0125
