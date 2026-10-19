@@ -60,11 +60,14 @@ pip install "numpy<2" "ray[tune]"
 RecSys/
 ├── setup.sh                    one-time environment setup
 ├── run_task1.sh                reproduces all of Task 1
+├── run_task2.sh / run_task3.sh reproduce Task 2 / Task 3 (no retraining)
 ├── task1/                      Task 1 code (see task1/README.md)
 │   ├── individual.py           1.1–1.2: tune + train individual models
 │   ├── hybrids.py              1.3–1.5: 7 hybrid models
 │   ├── common.py               shared helpers
 │   └── grids.yaml              hyperparameter grids
+├── task2/                      Task 2 code (see task2/README.md)
+├── task3/                      Task 3 code (see task3/README.md)
 ├── dataset/ml-100k/            MovieLens 100K (.inter, .item, .user)
 ├── recbole/config/<Model>/     RecBole config per model
 ├── outputs/                    SHARED results, committed to git
@@ -167,5 +170,6 @@ git push
 - [x] Shared split (`outputs/splits/`)
 - [x] Task 1.1–1.2: 11 individual models trained, tuned and exported
 - [x] Task 1.3–1.5: 7 hybrid models built, tuned and exported
-- [ ] Task 2: evaluation metrics and analysis
-- [ ] Task 3: rerankers
+- [x] Task 2: evaluation metrics and analysis (`task2/README.md`, `bash run_task2.sh`)
+- [x] Task 3: rerankers, pipelines and group analysis (`task3/README.md`, `bash run_task3.sh`)
+- [ ] Report
