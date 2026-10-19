@@ -46,7 +46,7 @@ pip install "numpy<2" "ray[tune]"
 
 1. **Don't retrain models.** All models are trained and exported once, and everyone works from the files in `outputs/`.
 2. **Use the split in `outputs/splits/`.** This is the exact split every model was trained and tested on.
-3. **Never use `save_split.py` from the course repo.** It doesn't set the random seed, so it produces a *different* split on every run, and that split doesn't match the one the models were trained on.
+3. The split in `outputs/splits/` is identical to the one produced by the course's fixed `save_split.py (verified after the Oct 2026 fix).
 4. **Report numbers from the `test` lists only** (`outputs/recommendations/test/`). The validation lists of the learned hybrids are in-sample.
 5. **Don't use the metrics RecBole prints in the report.** We implement our own (Task 2.1).
 6. **Pull before you start working:** `git pull`.
