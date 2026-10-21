@@ -8,7 +8,11 @@ Task 2.3 + 2.4 - how does each member contribute to the weighted hybrid?
    which members also ranked it in their own top-10, and which hits are found
    by exactly one member.
 3. Weighted-hybrid replica built from the exported top-100 lists (the full
-   score matrices are not shared). Same recipe as Task 1.3: per-user min-max
+   score matrices are not shared). Members (EASE, UserKNN, LightGCN,
+   ContentBased) and C are read from outputs/hybrids/hybrid_params.yaml.
+   Task 1 already reports coefficient CIs and a drop-one ablation on
+   validation (outputs/hybrids/Weighted_coefficient_stability.csv,
+   Weighted_ablation.csv); the replica adds the ablation on TEST. Same recipe as Task 1.3: per-user min-max
    normalised member scores, logistic regression with the same C, fitted on
    validation. Used for
      - per-member contribution to the final score of recommended items,
@@ -120,7 +124,8 @@ def replica_analysis(ctx, groups):
 
     w = fit(Xv, yv, MEMBERS)
     full = rank_ndcg(Xt, w, test_truth)
-    print(f"replica test NDCG@{K} = {full:.4f}   (original Hybrid-Weighted: see metrics_k10.csv)")
+    orig = np.mean([ndcg(r, test_truth[u], K) for u, r in load_recs("Hybrid-Weighted", "test", K).items()])
+    print(f"replica test NDCG@{K} = {full:.4f}   original Hybrid-Weighted = {orig:.4f}")
 
     # contribution of each member to the final score of the recommended items
     score = sum(w[m] * Xt[m] for m in MEMBERS)

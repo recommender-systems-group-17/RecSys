@@ -8,7 +8,8 @@ compare with the Random / Pop baselines, and test significance.
 Outputs (outputs/task2/):
     metrics_k<k>.csv           one row per model, all metrics
     per_user_k<k>.csv          per-user metrics (input for groups.py)
-    significance_k10.csv       Wilcoxon signed-rank on per-user NDCG@10
+    significance_k10.csv       Wilcoxon signed-rank on per-user NDCG@10, plus a
+                               95% paired bootstrap CI of the mean difference
     fig_tradeoff.png           accuracy vs beyond-accuracy
 """
 import argparse
@@ -35,6 +36,7 @@ def evaluate(ctx, groups, k):
         row = {"model": m, "type": "hybrid" if m in HYBRIDS else
                "baseline" if m in BASELINES else "individual"}
         row.update(df[ACCURACY + BEYOND_PER_USER].mean().to_dict())
+        row["NDCG_ci_low"], row["NDCG_ci_high"] = bootstrap_ci(df["NDCG"].values)
         row.update(system_metrics(recs, pu, ctx, groups["active"].to_dict(), k))
         row.update({f"Recall_{g}": v for g, v in item_group_recall(recs, ctx, k).items()})
         rows.append(row)
@@ -56,14 +58,31 @@ def holm(p):
     return adj
 
 
+N_BOOT, SEED = 2000, 2020
+
+
+def bootstrap_ci(x, n_boot=N_BOOT, seed=SEED):
+    """95% bootstrap CI of the mean of a per-user array (resampling users)."""
+    x = np.asarray(x, dtype=float)
+    idx = np.random.default_rng(seed).integers(0, len(x), (n_boot, len(x)))
+    m = x[idx].mean(axis=1)
+    return float(np.quantile(m, 0.025)), float(np.quantile(m, 0.975))
+
+
 def significance(per_user, reference):
-    """Paired Wilcoxon test of every model against `reference` on per-user NDCG."""
+    """Paired Wilcoxon test of every model against `reference` on per-user NDCG,
+    with a paired bootstrap CI of the mean difference."""
     wide = per_user.pivot(index="user_id", columns="model", values="NDCG")
     rows = []
     for m in wide.columns.drop(reference):
-        stat, p = wilcoxon(wide[m], wide[reference], zero_method="zsplit")
+        d = (wide[m] - wide[reference]).values
+        if np.all(d == 0):          # identical lists (e.g. Hybrid-Switching == EASE)
+            p = 1.0
+        else:
+            stat, p = wilcoxon(wide[m], wide[reference], zero_method="zsplit")
+        lo, hi = bootstrap_ci(d)
         rows.append({"model": m, "reference": reference,
-                     "mean_diff": wide[m].mean() - wide[reference].mean(),
+                     "mean_diff": d.mean(), "diff_ci_low": lo, "diff_ci_high": hi,
                      "wins": int((wide[m] > wide[reference]).sum()),
                      "losses": int((wide[m] < wide[reference]).sum()), "p": p})
     df = pd.DataFrame(rows)

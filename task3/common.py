@@ -26,10 +26,10 @@ K = 10
 LAMBDAS = [round(x, 2) for x in np.linspace(0, 0.9, 10)] + [0.95, 0.98, 1.0]
 POP_GROUPS = ("Head", "Mid", "Tail")
 
-# Base models the rerankers are applied to (3.2): the most accurate individual
-# model, the least popularity-biased one, a graph model in between, and the
-# weighted hybrid.
-MODELS = ["EASE", "LightGCN", "NeuMF", "Hybrid-Weighted"]
+# Base models the rerankers are applied to (3.2), all from the Task 1 study set:
+# the most accurate individual model (EASE), a graph model (LightGCN), the
+# content-based model, which ignores popularity entirely, and the weighted hybrid.
+MODELS = ["EASE", "LightGCN", "ContentBased", "Hybrid-Weighted"]
 
 
 def candidates(model, part):
@@ -89,5 +89,16 @@ def evaluate(recs, ctx, groups, k=K):
     return row, df.rename_axis("user_id")
 
 
+N_BOOT, SEED = 2000, 2020
+
+
+def paired_ci(after, before, n_boot=N_BOOT, seed=SEED):
+    """Mean of (after - before) over users with a 95% paired bootstrap CI."""
+    d = np.asarray(after, dtype=float) - np.asarray(before, dtype=float)
+    idx = np.random.default_rng(seed).integers(0, len(d), (n_boot, len(d)))
+    m = d[idx].mean(axis=1)
+    return float(d.mean()), float(np.quantile(m, 0.025)), float(np.quantile(m, 0.975))
+
+
 __all__ = ["ROOT", "OUT", "T3", "K", "LAMBDAS", "MODELS", "candidates", "contexts",
-           "evaluate", "user_groups", "pop_distribution", "jensen_shannon"]
+           "evaluate", "user_groups", "pop_distribution", "jensen_shannon", "paired_ci"]

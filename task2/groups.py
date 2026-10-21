@@ -19,15 +19,14 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from data import INDIVIDUAL, T2  # noqa: E402
+from data import MEMBERS, T2  # noqa: E402
 
 K = 10
 GROUPINGS = ["activity", "active", "mainstream", "gender", "age_group"]
 METRICS = ["NDCG", "Recall", "Novelty", "ILD", "MiscalKL", "PopLift", "APLT"]
 # models shown in figures (all models are in the CSVs)
-SHOWN = ["Pop", "ItemKNN", "UserKNN", "BPR", "SLIMElastic", "EASE",
-         "LightGCN", "NeuMF", "Hybrid-Weighted", "Hybrid-Mixed"]
-MEMBERS = [m for m in INDIVIDUAL if m != "Random"]
+SHOWN = ["Pop"] + MEMBERS + ["Hybrid-Weighted", "Hybrid-Mixed", "Hybrid-FeatureAugmentation"]
+N_BOOT, SEED = 2000, 2020
 
 
 def per_group(per_user, groups):
@@ -41,14 +40,28 @@ def per_group(per_user, groups):
     return pd.concat(out, ignore_index=True)
 
 
-def best_per_group(table):
+def best_per_group(table, per_user, groups):
+    """Best member per user group, and whether its lead over EASE is real:
+    95% paired bootstrap CI of (best member - EASE) over the group's users."""
+    wide = per_user.pivot(index="user_id", columns="model", values="NDCG")
+    rng = np.random.default_rng(SEED)
     rows = []
     for (g, grp), t in table.groupby(["grouping", "group"]):
         t = t.set_index("model")
         ind = t.loc[MEMBERS, "NDCG"]
+        best = ind.idxmax()
+        users = groups.index[groups[g].astype(str) == str(grp)].intersection(wide.index)
+        d = (wide.loc[users, best] - wide.loc[users, "EASE"]).values
+        if best == "EASE" or len(d) == 0:
+            lo = hi = 0.0
+        else:
+            m = d[rng.integers(0, len(d), (N_BOOT, len(d)))].mean(axis=1)
+            lo, hi = np.quantile(m, 0.025), np.quantile(m, 0.975)
         rows.append({"grouping": g, "group": grp, "n_users": int(t["n_users"].iloc[0]),
-                     "best_individual": ind.idxmax(), "best_individual_NDCG": ind.max(),
+                     "best_individual": best, "best_individual_NDCG": ind.max(),
                      "EASE_NDCG": t.loc["EASE", "NDCG"],
+                     "gain_vs_EASE_ci_low": lo, "gain_vs_EASE_ci_high": hi,
+                     "gain_significant": bool(lo > 0),
                      "best_overall": t["NDCG"].idxmax(), "best_overall_NDCG": t["NDCG"].max()})
     return pd.DataFrame(rows)
 
@@ -56,7 +69,7 @@ def best_per_group(table):
 def mainstream_within_activity(per_user, groups):
     """Mainstreaminess is confounded with activity (niche users have far longer
     profiles), so compare mainstream groups inside each activity group."""
-    df = per_user[per_user["model"].isin(["EASE", "Hybrid-Weighted", "Pop", "NeuMF"])]
+    df = per_user[per_user["model"].isin(["EASE", "LightGCN", "ContentBased", "Hybrid-Weighted", "Pop"])]
     df = df.merge(groups, left_on="user_id", right_index=True)
     return df.pivot_table(index=["model", "activity"], columns="mainstream",
                           values="NDCG", aggfunc="mean")[["Niche", "Diverse", "Blockbuster"]]
@@ -128,7 +141,7 @@ def main():
 
     table = per_group(per_user, groups)
     table.round(4).to_csv(T2 / f"groups_user_k{K}.csv", index=False)
-    best = best_per_group(table)
+    best = best_per_group(table, per_user, groups)
     best.round(4).to_csv(T2 / f"groups_best_model_k{K}.csv", index=False)
     print(best.round(4).to_string(index=False))
 

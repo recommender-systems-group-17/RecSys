@@ -16,12 +16,14 @@ T2 = OUT / "task2"
 DATA = ROOT / "dataset" / "ml-100k"
 DATASET = "ml-100k"
 
-INDIVIDUAL = ["Random", "Pop", "ItemKNN", "UserKNN", "BPR", "FISM",
-              "SLIMElastic", "EASE", "LightGCN", "NGCF", "NeuMF"]
+# Study models (Task 1.1): one per family. The other RecBole models trained in
+# Task 1 (ItemKNN, BPR, FISM, SLIMElastic, NGCF, NeuMF) are not part of the study.
+MEMBERS = ["EASE", "UserKNN", "LightGCN", "ContentBased"]   # hybrid members
+BASELINES = ["Random", "Pop"]
+INDIVIDUAL = BASELINES + MEMBERS
 HYBRIDS = ["Hybrid-Weighted", "Hybrid-Switching", "Hybrid-Mixed", "Hybrid-Cascade",
            "Hybrid-FeatureCombination", "Hybrid-FeatureAugmentation", "Hybrid-MetaLevel"]
 ALL_MODELS = INDIVIDUAL + HYBRIDS
-BASELINES = ["Random", "Pop"]
 
 
 def load_split(part):

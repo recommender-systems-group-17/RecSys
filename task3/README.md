@@ -18,9 +18,9 @@ python task3/groups.py            # 3.4        effects per user / item group (--
 |---|---|
 | `common.py` | Paths, candidate loading, lambda grid, base models, evaluation (Task 2 metrics + `PopMiscal`, `UserGap_PopMiscal`) |
 | `rerankers.py` | The four rerankers (3.1) |
-| `sweep.py` | Every reranker × base model × lambda on validation and test; lambda selection |
+| `sweep.py` | Every reranker × base model × lambda on validation and test; lambda selection; 95% CIs at the chosen lambda; sensitivity to the accuracy budget |
 | `pipelines.py` | Weighted hybrid with rerankers on the members (A) or on the hybrid output (B) |
-| `groups.py` | Before/after metrics per user group and per item popularity group |
+| `groups.py` | Before/after metrics per user group and per item popularity group; ItemFairness cost by position in the processing order |
 
 Outputs go to `outputs/task3/`: `.csv` files with all numbers and `fig_*.png` for the report.
 
@@ -46,27 +46,33 @@ Why these choices:
 
 - **Grid:** λ ∈ {0, 0.1, …, 0.9, 0.95, 0.98, 1}. It is finer near 1 because the item- and user-fairness gains are small next to differences in relevance.
 - **Rule:** for each (model, reranker), choose the **largest λ whose validation NDCG@10 is at most 5% below the model without reranking** (`--tolerance`). This means getting as much of the beyond-accuracy objective as possible within an explicit accuracy budget.
-- **Base models:**
+- **Base models** (all from the Task 1 study set):
   - EASE: the most accurate individual model
   - LightGCN: a graph model in between
-  - NeuMF: the least popularity-biased model
+  - ContentBased: ignores popularity entirely, the opposite extreme from EASE
   - Hybrid-Weighted
+- **Robustness of the budget:** `tolerance_sensitivity.csv` repeats the selection with 2%, 5% and 10% budgets.
+- **Uncertainty:** `selected_ci.csv` gives the change in NDCG and in a per-user target metric at the chosen lambda, with 95% paired bootstrap CIs (ILD, MiscalKL, APLT for ItemFairness, PopMiscal for UserFairness; Gini and the user gap are system-level, so per-user stand-ins are used).
 - **Caveat:** Hybrid-Weighted was fitted on validation, so its validation NDCG is optimistic. Selection depends on the relative drop, which is less affected.
 
 ## Pipelines (3.3)
 
-- **A (rerank, then combine):** each of the 10 members' top-100 lists is reranked into a new order, then the hybrid combines the reranked lists.
+- **A (rerank, then combine):** each of the 4 members' top-100 lists (EASE, UserKNN, LightGCN, ContentBased) is reranked into a new order, then the hybrid combines the reranked lists.
 - **B (combine, then rerank):** the reranker is applied to the hybrid's top-100.
-- **Positional features:** a reranker changes the order but not the scores, so for both pipelines the hybrid represents each member by its positional score `1 − rank/100`. The logistic-regression weights are fitted on validation with the Task 1.3 recipe and C (`pipeline_weights.csv`). This positional hybrid's test NDCG@10 is 0.3349, the same as Hybrid-Weighted.
+- **Positional features:** a reranker changes the order but not the scores, so for both pipelines the hybrid represents each member by its positional score `1 − rank/100`. The logistic-regression weights are fitted on validation with the Task 1.3 recipe and C (`pipeline_weights.csv`). The script prints this positional hybrid's test NDCG@10 next to Hybrid-Weighted's (0.3347) as a check.
 - **How to compare:** λ means different things in A and B, so compare the trade-off curves rather than equal λ values.
 - **ItemFairness in A** counts exposure over the members' full top-100 lists.
 
 ## Main observations (for the report)
 
+> **Rerun before using these numbers.** The observations below were written on the earlier Task 1 outputs (10-member hybrid, NeuMF as a base model). Update every number after `bash run_task3.sh`, and check each claim against `selected_ci.csv` (is the change outside its CI?) and `itemfair_order_effect.csv`.
+
+- **ItemFairness and processing order:** users are processed in a fixed random order, and later users face more accumulated exposure penalties. `itemfair_order_effect.csv` shows whether users late in the order pay more NDCG. If they do, the item-side intervention creates a user-side unfairness, which belongs in the 3.4 discussion.
+
 - **Candidate pool limits:** every base model puts almost all top-100 candidates in the Head group (EASE: 99% of top-10 slots are Head, 0 Tail). Rerankers can only redistribute within the top-100, so tail exposure stays below 2% even at the chosen λ.
 - **Cost of the targeted gain:** within the 5% budget, MiscalKL drops 19–34%, ILD rises 6–9%, Gini falls 1–6%, and UserGap_PopMiscal falls 72–95%. The relative cost differs: for EASE, ItemFairness costs only −0.5% NDCG for a 27% coverage gain (`selected_change.csv`).
 - **Side effects:** Diversity and Calibration reinforce each other (both change the genre mix), but neither changes popularity. UserFairness raises coverage by 9–51% and novelty, so the user-side and item-side objectives partly overlap.
-- **Base model matters:** NeuMF and LightGCN are already less popularity-biased, so the same λ gains them less on popularity and fairness. NeuMF's validation NDCG also drops faster, so it gets λ = 0.1 for three rerankers.
+- **Base model matters:** compare EASE (popularity-heavy) with ContentBased (popularity-blind): the same λ should gain ContentBased little on popularity and fairness, but its candidates are genre-matched, which changes what Diversity and Calibration can do.
 - **Group effects (EASE):**
   - Calibration costs Active users and users aged 35–49 the most NDCG.
   - ItemFairness slightly *improves* NDCG for Inactive, Diverse, 50+ and female users, but costs Niche and Blockbuster users.

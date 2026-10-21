@@ -17,6 +17,9 @@ Outputs (outputs/task3/):
     sweep.csv               every (model, reranker, lambda, split) with all metrics
     selected.csv            chosen lambda per (model, reranker) and its test metrics
     selected_change.csv     % change of every metric vs. no reranking (test)
+    selected_ci.csv         change in NDCG and in the per-user target metric at the
+                            chosen lambda, with 95% paired bootstrap CIs (test)
+    tolerance_sensitivity.csv  chosen lambda and test changes for budgets 2/5/10%
     per_user_selected.csv   per-user test metrics at lambda = 0 and the chosen lambda
     fig_tradeoff_curves.png NDCG@10 vs targeted metric along lambda (test)
 """
@@ -30,7 +33,8 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from common import K, LAMBDAS, MODELS, T3, candidates, contexts, evaluate, user_groups  # noqa: E402
+from common import (K, LAMBDAS, MODELS, T3, candidates, contexts, evaluate,  # noqa: E402
+                    paired_ci, user_groups)
 from rerankers import RERANKERS, ItemTable, rerank  # noqa: E402
 
 # metric each reranker is meant to improve, and whether higher is better
@@ -38,6 +42,11 @@ TARGET = {"Diversity": ("ILD", True), "Calibration": ("MiscalKL", False),
           "ItemFairness": ("Gini", False), "UserFairness": ("UserGap_PopMiscal", False)}
 REPORT = ["NDCG", "Recall", "ILD", "MiscalKL", "Novelty", "APLT", "Coverage", "Gini",
           "Exposure_Tail", "PopMiscal", "UserGap_PopMiscal", "UserGap_NDCG"]
+# per-user metric that best reflects each reranker's objective (for CIs);
+# Gini and the user gap are system-level, so APLT and PopMiscal stand in for them
+PER_USER_TARGET = {"Diversity": "ILD", "Calibration": "MiscalKL",
+                   "ItemFairness": "APLT", "UserFairness": "PopMiscal"}
+TOLERANCES = [0.02, 0.05, 0.10]
 
 
 def sweep(ctxs, groups, tab):
@@ -87,6 +96,37 @@ def select(df, tolerance):
     return sel, change.replace([np.inf, -np.inf], np.nan)   # undefined when the base is 0
 
 
+def selected_ci(sel, per_user):
+    """Paired (same users) change vs. lambda = 0 at the chosen lambda, test."""
+    rows = []
+    for _, s in sel.iterrows():
+        base = per_user[(per_user["model"] == s["model"]) & (per_user["reranker"] == "Original")]
+        after = per_user[(per_user["model"] == s["model"]) & (per_user["reranker"] == s["reranker"]) &
+                         np.isclose(per_user["lambda"], s["lambda"])]
+        if after.empty:            # chosen lambda = 0: nothing changes
+            continue
+        b, a = base.set_index("user_id"), after.set_index("user_id").loc[base["user_id"]]
+        row = {"model": s["model"], "reranker": s["reranker"], "lambda": s["lambda"]}
+        for col in ["NDCG", PER_USER_TARGET[s["reranker"]]]:
+            m, lo, hi = paired_ci(a[col].values, b[col].values)
+            row.update({f"d{col}": m, f"d{col}_ci_low": lo, f"d{col}_ci_high": hi})
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def tolerance_sensitivity(df):
+    rows = []
+    for tol in TOLERANCES:
+        sel, change = select(df, tol)
+        for _, s in sel.iterrows():
+            c = change.loc[(s["model"], s["reranker"])]
+            target = TARGET[s["reranker"]][0]
+            rows.append({"tolerance": tol, "model": s["model"], "reranker": s["reranker"],
+                         "lambda": s["lambda"], "NDCG_change_%": c["NDCG"],
+                         f"target_change_%": c[target], "target": target})
+    return pd.DataFrame(rows)
+
+
 def plot(df, sel):
     t = with_baseline(df[df["split"] == "test"])
     fig, axes = plt.subplots(1, 4, figsize=(19, 4.2))
@@ -129,10 +169,16 @@ def main():
     sel.round(4).to_csv(T3 / "selected.csv", index=False)
     change.round(2).to_csv(T3 / "selected_change.csv")
 
+    tolerance_sensitivity(df).round(3).to_csv(T3 / "tolerance_sensitivity.csv", index=False)
+
     keep = sel[["model", "reranker", "lambda"]].assign(chosen=True)
     pu = per_user.merge(keep, on=["model", "reranker", "lambda"], how="left")
     pu = pu[(pu["reranker"] == "Original") | pu["chosen"].fillna(False).astype(bool)]
     pu.drop(columns="chosen").to_csv(T3 / "per_user_selected.csv", index=False)
+    ci = selected_ci(sel, pu)
+    ci.round(5).to_csv(T3 / "selected_ci.csv", index=False)
+    print("\n== change at chosen lambda with 95% paired bootstrap CI (test)\n",
+          ci.round(4).to_string(index=False))
 
     plot(df, sel)
     print("\n== chosen lambda and test metrics\n", sel.round(4).to_string(index=False))

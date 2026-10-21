@@ -136,13 +136,21 @@ def rerank(cands, name, lam, tab, k=K):
     return {u: f(items, s, u, lam, tab, k) for u, (items, s) in cands.items()}
 
 
+def visit_order(users, seed=SEED):
+    """Order in which amortised_exposure processes users (fixed random order).
+    Users later in the order face more accumulated exposure penalties, so
+    groups.py checks whether their accuracy cost is larger."""
+    users = sorted(users, key=str)
+    np.random.default_rng(seed).shuffle(users)
+    return users
+
+
 def amortised_exposure(cands, lam, k=K, seed=SEED):
     """Item-side fairness. Users are visited in a fixed random order; an item's
     penalty is the share of previously visited users whose list contained it.
     The penalty does not depend on the rest of the list, so within one user
     this is a plain re-sort."""
-    users = list(cands)
-    np.random.default_rng(seed).shuffle(users)
+    users = visit_order(cands, seed)
     shown, out = {}, {}
     for n, u in enumerate(users):
         items, s = cands[u]

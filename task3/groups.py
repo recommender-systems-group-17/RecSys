@@ -12,6 +12,8 @@ Head/Mid/Tail popularity groups.
 Outputs (outputs/task3/):
     groups_user_change.csv   per (model, reranker, user group): metrics before/after
     groups_item_change.csv   per (model, reranker): exposure and recall per item group
+    itemfair_order_effect.csv  ItemFairness NDCG change by the user's position in
+                             the processing order (quintiles), with 95% CIs
     fig_groups_<model>.png
 """
 import argparse
@@ -23,8 +25,8 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from common import T3, contexts, user_groups  # noqa: E402
-from rerankers import RERANKERS  # noqa: E402
+from common import T3, candidates, contexts, paired_ci, user_groups  # noqa: E402
+from rerankers import RERANKERS, visit_order  # noqa: E402
 
 DIMENSIONS = ["active", "mainstream", "age_group", "gender"]
 METRICS = ["NDCG", "Recall", "ILD", "MiscalKL", "APLT", "PopMiscal"]
@@ -63,6 +65,25 @@ def item_change(sweep, selected):
             row[f"{c}_before"] = base.loc[s["model"], c]
             row[f"{c}_after"] = a[c]
         rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def order_effect(pu):
+    """ItemFairness processes users in a fixed random order, so later users face
+    more accumulated exposure penalties. Is their accuracy cost larger?"""
+    rows = []
+    for model, g in pu[pu["reranker"] == "ItemFairness"].groupby("model"):
+        order = visit_order(candidates(model, "test"))
+        pos = pd.Series(np.arange(len(order)) / len(order), index=order)
+        base = pu[(pu["model"] == model) & (pu["reranker"] == "Original")].set_index("user_id")
+        after = g.set_index("user_id")
+        users = after.index.intersection(base.index)
+        quint = pd.qcut(pos.loc[users], 5, labels=[f"Q{i}" for i in range(1, 6)])
+        for q, us in users.groupby(quint.values).items():
+            m, lo, hi = paired_ci(after.loc[us, "NDCG"].values, base.loc[us, "NDCG"].values)
+            rows.append({"model": model, "lambda": after["lambda"].iloc[0],
+                         "visit_quintile": q, "n_users": len(us),
+                         "dNDCG": m, "dNDCG_ci_low": lo, "dNDCG_ci_high": hi})
     return pd.DataFrame(rows)
 
 
@@ -124,6 +145,10 @@ def main():
     uc = user_change(pu, groups)
     ic = item_change(sweep, selected)
     uc.round(4).to_csv(T3 / "groups_user_change.csv", index=False)
+    oe = order_effect(pu)
+    oe.round(5).to_csv(T3 / "itemfair_order_effect.csv", index=False)
+    print(f"== ItemFairness: NDCG change by position in the processing order\n"
+          f"{oe.round(4).to_string(index=False)}")
     ic.round(4).to_csv(T3 / "groups_item_change.csv", index=False)
     plot(uc, ic, args.model)
 

@@ -18,8 +18,8 @@ python task2/hybrid_analysis.py  # 2.3 + 2.4  weighted-hybrid coefficient analys
 |---|---|
 | `data.py` | Loading the split, rec lists, genres, demographics; item and user groups |
 | `metrics.py` | Our own implementation of every metric (2.1) |
-| `evaluate.py` | All 18 models at k = 10 and 20, Wilcoxon tests vs best individual model and vs Pop |
-| `groups.py` | Metrics per user group and per item popularity group, best model per group, oracle switching |
+| `evaluate.py` | The study models (Random, Pop, EASE, UserKNN, LightGCN, ContentBased and the 7 hybrids) at k = 10 and 20; NDCG with 95% bootstrap CIs; Wilcoxon tests and paired bootstrap CIs vs the best individual model and vs Pop |
+| `groups.py` | Metrics per user group and per item popularity group, best model per group (with a paired bootstrap CI of its lead over EASE), oracle switching |
 | `hybrid_analysis.py` | Coefficients, hit attribution, leave-one-out ablation, per-group coefficients |
 
 Outputs go to `outputs/task2/`. The `.csv` files have all numbers and the `fig_*.png` files are the report figures.
@@ -53,7 +53,10 @@ Relevance is binary: the item is in the user's **test** set. Popularity, profile
 
 ## Design choices (for the report)
 
-- **Significance:** paired Wilcoxon signed-rank on per-user NDCG@10, with Holm correction across models. We compare against the best individual model (EASE) and against Pop.
+- **Models:** only the Task 1 study set: EASE, UserKNN, LightGCN and ContentBased (one per family), Pop and Random as baselines, and the 7 hybrids built from the four members. The other RecBole models from Task 1 are not evaluated.
+- **Significance:** paired Wilcoxon signed-rank on per-user NDCG@10, with Holm correction across models, plus a 95% paired bootstrap CI of the mean difference. We compare against the best individual model (EASE) and against Pop. Hybrid-Switching is identical to EASE (Task 1.5), so its p-value is set to 1.
+- **Per-group winners:** `groups_best_model_k10.csv` reports whether the best member of a group beats EASE significantly (95% paired bootstrap CI above zero). Without this, a near-tie in a small group looks like a finding.
 - **Oracle switching** (`oracle_k10.csv`) uses test labels. It is an upper bound for analysis, not a model: how much a perfect per-user or per-group choice of member could gain.
-- **Weighted-hybrid replica.** The full score matrices are local to whoever ran Task 1, so `hybrid_analysis.py` rebuilds the weighted hybrid from the exported top-100 lists. It uses the same recipe and the same C, normalising min-max over each top-100 list, and is fitted on validation. Its test NDCG@10 is 0.3395 vs 0.3349 for the original, close enough for ablation and contribution analysis. Coefficients from Task 1.3 are reported as they are.
+- **Weighted-hybrid replica.** The full score matrices are local to whoever ran Task 1, so `hybrid_analysis.py` rebuilds the weighted hybrid from the exported top-100 lists. It uses the same recipe, the same members and the same C (from `hybrid_params.yaml`), normalising min-max over each top-100 list, and is fitted on validation. The script prints its test NDCG@10 next to the original's (0.3347) as a check. Coefficients from Task 1.3 are reported as they are.
+- **Relation to Task 1:** Task 1 already reports the coefficients with bootstrap CIs and a drop-one ablation on validation (`outputs/hybrids/Weighted_coefficient_stability.csv`, `Weighted_ablation.csv`). Task 2.3 adds the ablation on test, hit attribution and group-specific weights. Use the same wording for the main finding (a large coefficient does not mean a large contribution).
 - **Per-group coefficients** are shown as the share of total |weight|. C is fixed, so absolute coefficients shrink when a group has fewer training rows.

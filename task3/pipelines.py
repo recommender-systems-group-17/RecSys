@@ -15,8 +15,9 @@ To combine reranked lists, members must be represented by their RANK (a
 reranker changes the order, not the scores). So the hybrid here uses a
 positional feature per member, 1 - rank/100 (0 if the item is not in the
 member's top-100), with logistic-regression weights fitted on the validation
-lists exactly as in Task 1.3. At lambda = 0 both pipelines are this same
-hybrid; its test NDCG is printed as a check against Hybrid-Weighted.
+lists exactly as in Task 1.3. Members (EASE, UserKNN, LightGCN, ContentBased)
+come from hybrid_params.yaml. At lambda = 0 both pipelines are this same
+hybrid; its test NDCG is printed next to Hybrid-Weighted's as a check.
 
 Since lambda acts on different inputs in A and B, the pipelines are compared
 by their trade-off curves (NDCG vs. targeted metric), not at equal lambda.
