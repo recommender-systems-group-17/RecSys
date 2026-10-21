@@ -1,0 +1,5 @@
+model,coefficient,boot_mean,ci_low,ci_high,share_mean,share_ci_low,share_ci_high,frac_positive,frac_largest_weight
+LightGCN,4.8296,4.8547,4.3975,5.3905,0.5755,0.5402,0.6162,1.0,1.0
+UserKNN,1.6277,1.617,1.3605,1.8705,0.1919,0.1626,0.2264,1.0,0.0
+EASE,1.2087,1.2235,0.8864,1.5781,0.1453,0.1024,0.1865,1.0,0.0
+ContentBased,0.7433,0.7358,0.6092,0.8674,0.0873,0.073,0.102,1.0,0.0

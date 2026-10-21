@@ -93,21 +93,23 @@ RecSys/
 
 - **One individual model per category:** linear item-item (EASE), neighbourhood CF (UserKNN), graph / latent factor (LightGCN), content-based (ContentBased).
 - **The hybrids are built from these 4 models.** Pop and Random are baselines only.
-- **Why these four:** we first tuned 11 models and kept one per category, choosing less correlated models so the hybrid analysis is interpretable. See `task1/README.md`.
+- **Why these four:** we first tuned 12 models and kept one per category. Within each category the alternatives were statistically indistinguishable on validation. See `task1/README.md`.
 
 **Not in the study** (files kept for reference only): ItemKNN, BPR, FISM, SLIMElastic, NGCF, NeuMF.
 
 ### Test NDCG@10 (quick Task 1 metric; final numbers come from Task 2)
 
-| Model | NDCG@10 | | Hybrid | NDCG@10 |
-|---|---|---|---|---|
-| EASE | 0.3302 | | FeatureAugmentation | 0.3315 |
-| LightGCN | 0.3028 | | Weighted | 0.3310 |
-| UserKNN | 0.2877 | | Switching | 0.3302 |
-| Pop | 0.0985 | | Cascade | 0.3301 |
-| ContentBased | 0.0322 | | Mixed | 0.3283 |
-| Random | 0.0076 | | MetaLevel | 0.2998 |
-| | | | FeatureCombination | 0.2542 |
+| Model | NDCG@10 | | Hybrid | NDCG@10 | vs EASE |
+|---|---|---|---|---|---|
+| EASE | 0.3302 | | Weighted | 0.3347 | +0.0045 (n.s.) |
+| LightGCN | 0.3020 | | FeatureAugmentation | 0.3346 | +0.0044 (n.s.) |
+| UserKNN | 0.2877 | | Mixed | 0.3316 | +0.0014 (n.s.) |
+| Pop | 0.0985 | | Switching | 0.3302 | identical to EASE |
+| ContentBased | 0.0322 | | Cascade | 0.3301 | −0.0001 (n.s.) |
+| Random | 0.0076 | | MetaLevel | 0.2998 | −0.0304 (sig.) |
+| | | | FeatureCombination | 0.2542 | −0.0760 (sig.) |
+
+n.s. = not significant, sig. = significant (Wilcoxon, Holm-corrected). Confidence intervals and the evidence behind the model choices are in `outputs/analysis/`.
 
 ---
 

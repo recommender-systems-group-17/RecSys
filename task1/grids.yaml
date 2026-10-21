@@ -41,10 +41,12 @@ FISM:
     learning_rate: [0.001, 0.005]
 
 LightGCN:
+  # extended after the first run: the optimum (3 layers, lr 0.005) was at the
+  # grid edge. Run with --resume to only train the new configurations.
   fixed: {epochs: 300, eval_step: 5, stopping_step: 4}
   grid:
-    n_layers: [1, 2, 3]
-    learning_rate: [0.001, 0.005]
+    n_layers: [1, 2, 3, 4]
+    learning_rate: [0.001, 0.005, 0.01]
 
 NGCF:
   fixed: {epochs: 300, eval_step: 5, stopping_step: 4}

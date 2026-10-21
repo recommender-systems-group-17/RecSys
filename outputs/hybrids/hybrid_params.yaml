@@ -4,18 +4,19 @@ Weighted:
   - UserKNN
   - LightGCN
   - ContentBased
-  C: 0.1
+  C: 10.0
   weights:
-    EASE: 1.5828744466222155
-    UserKNN: 1.575034776678426
-    LightGCN: 3.371009407908181
-    ContentBased: 0.6949071414155983
+    EASE: 1.208724300215954
+    UserKNN: 1.6276790616220245
+    LightGCN: 4.829629539274357
+    ContentBased: 0.7433387136533367
 Switching:
   members:
   - EASE
   - UserKNN
   - LightGCN
   - ContentBased
+  criterion: activity
   n_groups: 2
   edges:
   - 16.0

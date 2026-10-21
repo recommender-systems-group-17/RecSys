@@ -8,6 +8,8 @@ Usage (from repo root):
     python task1/individual.py --stage final      # reuse outputs/best_params.yaml
     python task1/individual.py --quick            # smoke test: 1 config, 2 epochs
     python task1/individual.py --models ContentBased   # our own content-based model
+    python task1/individual.py --models LightGCN --resume   # only run configs not yet in
+                                                            # outputs/tuning/LightGCN.csv
 
 Writes:
     outputs/tuning/<Model>.csv            every config tried + validation scores
@@ -23,6 +25,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -50,13 +53,38 @@ def combos(spec, quick):
         yield {**fixed, **dict(zip(keys, vals))}
 
 
-def tune(models, quick):
+def _same(a, b):
+    try:
+        return bool(np.isclose(float(a), float(b)))
+    except (TypeError, ValueError):
+        return str(a) == str(b)
+
+
+def _previous(name, params, old):
+    """Row of an earlier tuning run with exactly these params, or None."""
+    if old is None:
+        return None
+    for _, row in old.iterrows():
+        if all(k in row and _same(row[k], v) for k, v in params.items()):
+            return row.to_dict()
+    return None
+
+
+def tune(models, quick, resume=False):
     grids = load_yaml(GRIDS)
     best = load_yaml(BEST) if BEST.exists() else {}
     (OUT / "tuning").mkdir(parents=True, exist_ok=True)
     for name in models:
+        path = OUT / "tuning" / f"{name}.csv"
+        old = pd.read_csv(path) if resume and path.exists() else None
         tried, rows = list(combos(grids.get(name, {}), quick)), []
         for params in tried:
+            prev = _previous(name, params, old)
+            if prev is not None:
+                rows.append({**prev, **params})
+                print(f"[tune] {name} {params} -> reused valid ndcg@10={prev['valid_ndcg@10']:.4f}",
+                      flush=True)
+                continue
             t0 = time.time()
             v = run(name, params)["valid_result"]
             rows.append({**params, **{f"valid_{m}": x for m, x in v.items()},
@@ -105,11 +133,13 @@ def main():
     p.add_argument("--stage", choices=["tune", "final", "all"], default="all")
     p.add_argument("--models", nargs="+", default=list(MODELS), choices=list(MODELS))
     p.add_argument("--quick", action="store_true")
+    p.add_argument("--resume", action="store_true",
+                   help="reuse configs already in outputs/tuning/<Model>.csv, only run new ones")
     p.add_argument("--export_k", type=int, default=100, help="length of exported lists")
     a = p.parse_args()
     clear_cli_args()
     if a.stage in ("tune", "all"):
-        tune(a.models, a.quick)
+        tune(a.models, a.quick, a.resume)
     if a.stage in ("final", "all"):
         final(a.models, a.export_k)
 

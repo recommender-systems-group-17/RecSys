@@ -27,7 +27,7 @@ LightGCN:
   epochs: 300
   eval_step: 5
   stopping_step: 4
-  n_layers: 3
+  n_layers: 4
   learning_rate: 0.005
 NGCF:
   epochs: 300

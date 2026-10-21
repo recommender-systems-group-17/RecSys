@@ -1,5 +1,13 @@
-n_groups,select_ndcg@10,assignment
-2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}"
-5,0.2465790122463029,"{0: 'EASE', 1: 'LightGCN', 2: 'EASE', 3: 'EASE', 4: 'EASE'}"
-4,0.24568826992610512,"{0: 'EASE', 1: 'UserKNN', 2: 'EASE', 3: 'EASE'}"
-3,0.2430054016286011,"{0: 'EASE', 1: 'LightGCN', 2: 'EASE'}"
+criterion,n_groups,select_ndcg@10,assignment,switches
+activity,2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}",False
+activity,3,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE'}",False
+activity,4,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE'}",False
+activity,5,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE', 4: 'EASE'}",False
+mainstreamness,2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}",False
+mainstreamness,3,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE'}",False
+mainstreamness,4,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE'}",False
+mainstreamness,5,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE', 4: 'EASE'}",False
+genre_diversity,2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}",False
+genre_diversity,3,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE'}",False
+genre_diversity,4,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE'}",False
+genre_diversity,5,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE', 4: 'EASE'}",False

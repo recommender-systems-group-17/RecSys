@@ -1,0 +1,9 @@
+a,b,decision,split,mean_a,mean_b,diff,diff_ci_low,diff_ci_high,p_wilcoxon,p_ttest,users_a_better,users_b_better,p_wilcoxon_holm,significant_0.05
+EASE,SLIMElastic,linear item-item: EASE kept,valid,0.2568,0.2572,-0.0004,-0.0075,0.0065,0.6227,0.9112,342,371,1.0,False
+UserKNN,ItemKNN,neighbourhood: UserKNN kept,valid,0.2355,0.2234,0.0121,0.0035,0.02,0.0446,0.0042,374,326,0.2231,False
+LightGCN,NGCF,graph: LightGCN kept,valid,0.2433,0.2446,-0.0013,-0.0089,0.0067,0.6963,0.747,357,347,1.0,False
+LightGCN,BPR,latent factor covered by LightGCN,valid,0.2433,0.2411,0.0022,-0.0056,0.0099,0.4501,0.5826,376,331,1.0,False
+ContentBased,Pop,content-based vs popularity baseline,valid,0.0371,0.0944,-0.0573,-0.0665,-0.0478,0.0,0.0,136,368,0.0,True
+EASE,LightGCN,best vs 2nd-best study model,valid,0.2568,0.2433,0.0135,0.0038,0.0228,0.0022,0.0042,396,345,0.0133,True
+EASE,UserKNN,best vs 3rd-best study model,valid,0.2568,0.2355,0.0213,0.0141,0.0288,0.0,0.0,439,281,0.0,True
+LightGCN,UserKNN,2nd vs 3rd study model,valid,0.2433,0.2355,0.0078,-0.0024,0.0186,0.2072,0.1533,390,370,0.8286,False

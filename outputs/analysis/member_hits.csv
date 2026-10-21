@@ -1,0 +1,6 @@
+model,hits,unique_hits,unique_share_of_own_hits,users_with_hit
+EASE,1665,177.0,0.1063,0.7815
+UserKNN,1473,203.0,0.1378,0.755
+LightGCN,1545,371.0,0.2401,0.7656
+ContentBased,263,149.0,0.5665,0.2206
+union of all members (oracle),2461,,,0.8706
