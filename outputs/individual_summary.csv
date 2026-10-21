@@ -10,3 +10,4 @@ LightGCN,"{'epochs': 300, 'eval_step': 5, 'stopping_step': 4, 'n_layers': 3, 'le
 NeuMF,"{'epochs': 300, 'eval_step': 5, 'stopping_step': 4, 'learning_rate': 0.001, 'dropout_prob': 0.3}",0.2126,0.3724,0.2219,0.7455,0.1522,0.2298,0.4583,0.2684,0.7625,0.1843
 FISM,"{'epochs': 300, 'eval_step': 5, 'stopping_step': 4, 'embedding_size': 32, 'learning_rate': 0.005}",0.1171,0.2379,0.1238,0.5514,0.09,0.1272,0.2629,0.1415,0.5673,0.1043
 NGCF,"{'epochs': 300, 'eval_step': 5, 'stopping_step': 4, 'learning_rate': 0.001, 'message_dropout': 0.1}",0.2251,0.4069,0.2446,0.7678,0.1663,0.2562,0.4865,0.2934,0.8028,0.1964
+ContentBased,"{'weighting': 'binary', 'idf': True, 'year_weight': 0.0}",,,0.037102772905318535,,,,,0.03219158650217028,,

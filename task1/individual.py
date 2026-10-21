@@ -7,6 +7,7 @@ Usage (from repo root):
     python task1/individual.py --models BPR EASE  # only some models
     python task1/individual.py --stage final      # reuse outputs/best_params.yaml
     python task1/individual.py --quick            # smoke test: 1 config, 2 epochs
+    python task1/individual.py --models ContentBased   # our own content-based model
 
 Writes:
     outputs/tuning/<Model>.csv            every config tried + validation scores
@@ -28,8 +29,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (MODELS, OUT, check_split, clear_cli_args, export_split,  # noqa: E402
                     export_topk, load_yaml, save_cache, save_yaml, score_matrix, split_users, train)
 
+from content_based import train_content  # noqa: E402
+
 GRIDS = Path(__file__).resolve().parent / "grids.yaml"
 BEST = OUT / "best_params.yaml"
+
+
+def run(name, params):
+    return train_content(params) if name == "ContentBased" else train(name, params)
 
 
 def combos(spec, quick):
@@ -51,7 +58,7 @@ def tune(models, quick):
         tried, rows = list(combos(grids.get(name, {}), quick)), []
         for params in tried:
             t0 = time.time()
-            v = train(name, params)["valid_result"]
+            v = run(name, params)["valid_result"]
             rows.append({**params, **{f"valid_{m}": x for m, x in v.items()},
                          "seconds": round(time.time() - t0, 1)})
             print(f"[tune] {name} {params} -> valid ndcg@10={v['ndcg@10']:.4f}", flush=True)
@@ -70,15 +77,18 @@ def final(models, k):
     for name in models:
         params = best.get(name, {})
         print(f"[final] training {name} with {params}", flush=True)
-        res = train(name, params)
+        res = run(name, params)
         if split_done:
             check_split(res)
         else:
             export_split(res)
             split_done = True
         for split in ("valid", "test"):
-            users = split_users(res[split])
-            scores = score_matrix(res["model"], res[split], users, res["config"]["device"])
+            if "scores" in res:  # ContentBased computes its scores directly
+                scores, users = res["scores"][split]
+            else:
+                users = split_users(res[split])
+                scores = score_matrix(res["model"], res[split], users, res["config"]["device"])
             save_cache(name, split, scores, users)
             export_topk(name, scores, users, res["dataset"], split, k, res["config"])
         row = {"model": name, "params": str(params),

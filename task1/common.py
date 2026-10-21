@@ -44,6 +44,8 @@ MODELS = {
     "LightGCN":    ("LightGCN",    "recbole/config/LightGCN/ml-100k.yaml"),
     "NGCF":        ("NGCF",        "recbole/config/NGCF/ml-100k.yaml"),
     "NeuMF":       ("NeuMF",       "recbole/config/NeuMF/ml-100k.yaml"),
+    # Not in RecBole: implemented in task1/content_based.py
+    "ContentBased": (None,         None),
 }
 
 # Applied to every run. seed and eval_args are NOT touched, so all models
@@ -161,7 +163,7 @@ def export_topk(name, scores, users, dataset, split, k, config, out_root=OUT / "
 def save_cache(name, split, scores, users):
     d = CACHE / "scores" / split
     d.mkdir(parents=True, exist_ok=True)
-    np.save(d / f"{name}.npy", scores.astype(np.float32))
+    np.save(d / f"{name}.npy", scores)  # keep dtype (ContentBased needs float64)
     np.save(d / "users.npy", users)
 
 

@@ -41,3 +41,7 @@ NeuMF:
   stopping_step: 4
   learning_rate: 0.001
   dropout_prob: 0.3
+ContentBased:
+  weighting: binary
+  idf: true
+  year_weight: 0.0

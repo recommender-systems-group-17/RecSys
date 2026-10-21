@@ -57,3 +57,10 @@ NeuMF:
   grid:
     learning_rate: [0.001, 0.005]
     dropout_prob: [0.1, 0.3]
+
+# Our own model (task1/content_based.py): genre + release-decade features.
+ContentBased:
+  grid:
+    weighting: [binary, rating]
+    idf: [false, true]
+    year_weight: [0.0, 0.5, 1.0]

@@ -16,7 +16,11 @@ individual models exported by task1/individual.py.
   MetaLevel            the item-item model learned by EASE is used as the user
                        representation inside a user-based kNN            (1.4)
 
-Members = every individual model except Random.
+Members (default, one model per family; change with --members):
+  EASE (linear item-item), UserKNN (neighbourhood), LightGCN (graph /
+  latent factor), ContentBased (content-based).
+Pop and Random are baselines only. FeatureAugmentation and MetaLevel always
+use EASE internally, whatever the members are.
 
 Tuning (1.5)
   Hybrids with learned parameters (Weighted, Switching, FeatureCombination):
@@ -30,8 +34,9 @@ All models only ever see the TRAIN split as input, so valid and test scores
 are produced the same way as RecBole's individual models.
 
 Usage (from repo root):
-    python task1/hybrids.py                 # all hybrids
+    python task1/hybrids.py                 # all hybrids, default members
     python task1/hybrids.py --only Cascade MetaLevel
+    python task1/hybrids.py --members UserKNN EASE BPR   # other member set
 """
 import argparse
 import sys
@@ -52,6 +57,7 @@ from recbole.utils import init_seed  # noqa: E402
 HOUT = OUT / "hybrids"
 K_EXPORT = 100
 SEED = 2020
+DEFAULT_MEMBERS = ["EASE", "UserKNN", "LightGCN", "ContentBased"]
 HYBRIDS = ["Weighted", "Switching", "Mixed", "Cascade",
            "FeatureCombination", "FeatureAugmentation", "MetaLevel"]
 
@@ -447,17 +453,21 @@ class Hybrids:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--only", nargs="+", choices=HYBRIDS, default=HYBRIDS)
+    p.add_argument("--members", nargs="+", choices=[m for m in MODELS if m != "Random"],
+                   default=DEFAULT_MEMBERS)
     a = p.parse_args()
     clear_cli_args()
     HOUT.mkdir(parents=True, exist_ok=True)
 
     cached = [m for m in MODELS if (ROOT / "cache/scores/test" / f"{m}.npy").exists()]
-    members = [m for m in cached if m != "Random"]
-    missing = [m for m in MODELS if m not in cached]
+    missing = [m for m in a.members if m not in cached]
     if missing:
-        print(f"WARNING: no cached scores for {missing} - run task1/individual.py first. "
-              "Continuing without them.")
-    h = Hybrids(members)
+        sys.exit(f"No cached scores for {missing}. Run: python task1/individual.py "
+                 f"--stage final --models {' '.join(missing)}")
+    if "EASE" not in a.members:
+        print("note: FeatureAugmentation and MetaLevel still use EASE internally")
+    print("hybrid members:", ", ".join(a.members))
+    h = Hybrids(a.members)
 
     methods = {"Weighted": h.weighted, "Switching": h.switching, "Mixed": h.mixed,
                "Cascade": h.cascade, "FeatureCombination": h.feature_combination,
@@ -482,7 +492,7 @@ def main():
     for name in a.only:
         print(f"[{name}]", flush=True)
         params, sv, st = methods[name]()
-        all_params[name] = params
+        all_params[name] = {"members": list(a.members), **params}
         save_yaml(all_params, params_path)
         full = f"Hybrid-{name}"
         export_topk(full, sv, h.S["valid"]["users"], h.dataset, "valid", K_EXPORT, h.config)
