@@ -60,12 +60,15 @@ pip install "numpy<2" "ray[tune]"
 RecSys/
 ├── setup.sh                    one-time environment setup
 ├── run_task1.sh                reproduces all of Task 1
+├── run_task2.sh / run_task3.sh reproduce Task 2 / Task 3 (no retraining)
 ├── task1/                      Task 1 code (see task1/README.md)
 │   ├── individual.py           1.1–1.2: tune + train individual models
 │   ├── content_based.py        our content-based model (not in RecBole)
 │   ├── hybrids.py              1.3–1.5: 7 hybrid models
 │   ├── common.py               shared helpers
 │   └── grids.yaml              hyperparameter grids
+├── task2/                      Task 2 code (see task2/README.md)
+├── task3/                      Task 3 code (see task3/README.md)
 ├── dataset/ml-100k/            MovieLens 100K (.inter, .item, .user)
 ├── recbole/config/<Model>/     RecBole config per model
 ├── outputs/                    SHARED results, committed to git
@@ -206,6 +209,7 @@ Coordinate in the group chat before doing this, so only one person does it.
 - [x] Environment setup (`setup.sh`)
 - [x] Shared split (`outputs/splits/`), verified against the fixed `save_split.py`
 - [x] Task 1.1–1.2: individual models trained, tuned and exported; final study set chosen (EASE, UserKNN, LightGCN, ContentBased)
-- [x] Task 1.3–1.5: 7 hybrid models built and tuned on the 4 study models
-- [ ] Task 2: evaluation metrics and analysis
-- [ ] Task 3: rerankers
+- [x] Task 1.3–1.5: 7 hybrid models built, tuned and exported
+- [x] Task 2: evaluation metrics and analysis (`task2/README.md`, `bash run_task2.sh`)
+- [x] Task 3: rerankers, pipelines and group analysis (`task3/README.md`, `bash run_task3.sh`)
+- [ ] Report
