@@ -1,5 +1,13 @@
-n_groups,select_ndcg@10,assignment
-5,0.24859617538923276,"{0: 'BPR', 1: 'SLIMElastic', 2: 'SLIMElastic', 3: 'EASE', 4: 'EASE'}"
-4,0.24705621734708003,"{0: 'EASE', 1: 'SLIMElastic', 2: 'SLIMElastic', 3: 'EASE'}"
-3,0.2449929199590797,"{0: 'SLIMElastic', 1: 'SLIMElastic', 2: 'EASE'}"
-2,0.2425802374175927,"{0: 'SLIMElastic', 1: 'EASE'}"
+criterion,n_groups,select_ndcg@10,assignment,switches
+activity,2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}",False
+activity,3,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE'}",False
+activity,4,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE'}",False
+activity,5,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE', 4: 'EASE'}",False
+mainstreamness,2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}",False
+mainstreamness,3,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE'}",False
+mainstreamness,4,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE'}",False
+mainstreamness,5,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE', 4: 'EASE'}",False
+genre_diversity,2,0.24859427557567884,"{0: 'EASE', 1: 'EASE'}",False
+genre_diversity,3,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE'}",False
+genre_diversity,4,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE'}",False
+genre_diversity,5,0.24859427557567884,"{0: 'EASE', 1: 'EASE', 2: 'EASE', 3: 'EASE', 4: 'EASE'}",False

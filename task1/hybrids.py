@@ -4,8 +4,11 @@ individual models exported by task1/individual.py.
 
   Weighted             scores of all members, normalised per user, combined with
                        weights learned by logistic regression            (1.3)
-  Switching            users bucketed by activity; each bucket uses the member
-                       that works best for that bucket                   (1.4)
+  Switching            users bucketed by a user characteristic (activity,
+                       mainstreamness or genre diversity); a bucket switches
+                       away from the overall best member only if another
+                       member is significantly better there (95% paired
+                       bootstrap CI > 0)                                 (1.4)
   Mixed                reciprocal rank fusion of several members' lists  (1.4)
   Cascade              member A picks the top-N candidates, member B
                        re-orders them                                    (1.4)
@@ -16,7 +19,11 @@ individual models exported by task1/individual.py.
   MetaLevel            the item-item model learned by EASE is used as the user
                        representation inside a user-based kNN            (1.4)
 
-Members = every individual model except Random.
+Members (default, one model per family; change with --members):
+  EASE (linear item-item), UserKNN (neighbourhood), LightGCN (graph /
+  latent factor), ContentBased (content-based).
+Pop and Random are baselines only. FeatureAugmentation and MetaLevel always
+use EASE internally, whatever the members are.
 
 Tuning (1.5)
   Hybrids with learned parameters (Weighted, Switching, FeatureCombination):
@@ -26,12 +33,18 @@ Tuning (1.5)
   Hybrids without learned parameters (the rest): hyperparameters are chosen on
   all validation users. Test is never used for any choice.
 
+Extra evidence written for the report (Weighted hybrid):
+  Weighted_coefficient_stability.csv  bootstrap CIs of the coefficients
+  Weighted_ablation.csv               drop-one-member effect on SELECT users
+Switching_groups_all.csv: per-group NDCG of every member, every criterion.
+
 All models only ever see the TRAIN split as input, so valid and test scores
 are produced the same way as RecBole's individual models.
 
 Usage (from repo root):
-    python task1/hybrids.py                 # all hybrids
+    python task1/hybrids.py                 # all hybrids, default members
     python task1/hybrids.py --only Cascade MetaLevel
+    python task1/hybrids.py --members UserKNN EASE BPR   # other member set
 """
 import argparse
 import sys
@@ -52,6 +65,9 @@ from recbole.utils import init_seed  # noqa: E402
 HOUT = OUT / "hybrids"
 K_EXPORT = 100
 SEED = 2020
+DEFAULT_MEMBERS = ["EASE", "UserKNN", "LightGCN", "ContentBased"]
+N_BOOT = 200            # bootstrap refits for coefficient stability
+SWITCH_CRITERIA = ["activity", "mainstreamness", "genre_diversity"]
 HYBRIDS = ["Weighted", "Switching", "Mixed", "Cascade",
            "FeatureCombination", "FeatureAugmentation", "MetaLevel"]
 
@@ -110,6 +126,9 @@ class Hybrids:
         self.X = train_matrix(loaders["train"], self.n_users, self.n_items)
         self.R = train_matrix(loaders["train"], self.n_users, self.n_items, ds.config["RATING_FIELD"])
 
+        self.G = self._genre_matrix()
+        crit_all = self._user_characteristics()
+
         self.S = {}
         for split in ("valid", "test"):
             scores = {m: load_cache(m, split)[0] for m in members}
@@ -120,6 +139,7 @@ class Hybrids:
                 "norm": {m: normalize(s) for m, s in scores.items()},
                 "truth": ground_truth(loaders[split], users),
                 "counts": self.X[users].sum(1),
+                "crit": {c: v[users] for c, v in crit_all.items()},
             }
         V = self.S["valid"]
         rng = np.random.default_rng(SEED)
@@ -131,6 +151,36 @@ class Hybrids:
         self.ease_reg = float(best.get("EASE", {}).get("reg_weight", 250.0))
         print("members by validation NDCG@10:",
               ", ".join(f"{m}={self.per_model_v[m].mean():.4f}" for m in self.rank))
+
+    def _genre_matrix(self):
+        ds = self.dataset
+        i_tok = ds.field2token_id[ds.iid_field]
+        items = pd.read_csv(ROOT / "dataset/ml-100k/ml-100k.item", sep="\t", dtype=str)
+        items.columns = [c.split(":")[0] for c in items.columns]
+        genres = sorted({g for gs in items["class"].dropna() for g in gs.split()})
+        G = np.zeros((self.n_items, len(genres)), dtype=np.float32)
+        for item_id, gs in zip(items["item_id"], items["class"]):
+            i = i_tok.get(item_id)
+            if i is None:
+                continue
+            for g in str(gs).split():
+                if g in genres:
+                    G[i, genres.index(g)] = 1.0
+        return G
+
+    def _user_characteristics(self):
+        """Per-user values (all internal ids) used as switching criteria; TRAIN only.
+          activity        number of train interactions
+          mainstreamness  mean log-popularity of the user's train items
+          genre_diversity entropy of the genre distribution of the user's train items"""
+        X = self.X
+        n_u = np.maximum(X.sum(1), 1.0)
+        log_pop = np.log1p(X.sum(0))
+        prof = X @ self.G
+        p = prof / np.maximum(prof.sum(1, keepdims=True), 1e-12)
+        ent = -(p * np.log(np.where(p > 0, p, 1.0))).sum(1)
+        return {"activity": X.sum(1), "mainstreamness": (X @ log_pop) / n_u,
+                "genre_diversity": ent}
 
     @staticmethod
     def _load_split():
@@ -146,22 +196,77 @@ class Hybrids:
         return df
 
     # ---------------------------------------------------------------- 1.3
-    def _fit_lr(self, rows, C, depth=50):
+    def _fit_lr(self, rows, C, depth=50, members=None):
         """Logistic regression on candidate (user, item) pairs = union of each
-        member's top-`depth` items. Label = item is in the validation set."""
+        member's top-`depth` items. Label = item is in the validation set.
+        rows: boolean mask over validation users, or an array of row indices
+        (may contain repeats, used for bootstrapping)."""
+        members = members or self.members
         V, Xs, ys = self.S["valid"], [], []
-        idx = np.where(rows)[0]
-        tops = {m: np.argsort(-V["norm"][m][idx], axis=1)[:, :depth] for m in self.members}
+        rows = np.asarray(rows)
+        idx = np.where(rows)[0] if rows.dtype == bool else rows
+        tops = {m: np.argsort(-V["norm"][m][idx], axis=1)[:, :depth] for m in members}
         for r, u in enumerate(idx):
-            cand = np.unique(np.concatenate([tops[m][r] for m in self.members]))
-            Xs.append(np.stack([V["norm"][m][u, cand] for m in self.members], axis=1))
+            cand = np.unique(np.concatenate([tops[m][r] for m in members]))
+            Xs.append(np.stack([V["norm"][m][u, cand] for m in members], axis=1))
             ys.append(np.isin(cand, list(V["truth"][u])).astype(int))
         lr = LogisticRegression(C=C, max_iter=5000).fit(np.vstack(Xs), np.concatenate(ys))
-        return dict(zip(self.members, lr.coef_[0].astype(float)))
+        return dict(zip(members, lr.coef_[0].astype(float)))
 
     def _weighted(self, split, w):
         D = self.S[split]
-        return masked(sum(w[m] * D["norm"][m] for m in self.members), D["mask"])
+        return masked(sum(x * D["norm"][m] for m, x in w.items()), D["mask"])
+
+    def _coefficient_stability(self, C, w_full):
+        """Refit on bootstrap samples of validation users -> how stable is each weight?"""
+        rng = np.random.default_rng(SEED)
+        n = len(self.S["valid"]["users"])
+        boot = []
+        for b in range(N_BOOT):
+            boot.append(self._fit_lr(rng.integers(0, n, n), C))
+            if (b + 1) % 50 == 0:
+                print(f"  bootstrap {b + 1}/{N_BOOT}", flush=True)
+        B = pd.DataFrame(boot)[self.members]
+        share = B.abs().div(B.abs().sum(1), axis=0)
+        largest = B.idxmax(axis=1)
+        out = pd.DataFrame({
+            "model": self.members,
+            "coefficient": [w_full[m] for m in self.members],
+            "boot_mean": B.mean().values,
+            "ci_low": B.quantile(0.025).values,
+            "ci_high": B.quantile(0.975).values,
+            "share_mean": share.mean().values,
+            "share_ci_low": share.quantile(0.025).values,
+            "share_ci_high": share.quantile(0.975).values,
+            "frac_positive": (B > 0).mean().values,
+            "frac_largest_weight": [float((largest == m).mean()) for m in self.members],
+        })
+        out.sort_values("coefficient", ascending=False).round(4).to_csv(
+            HOUT / "Weighted_coefficient_stability.csv", index=False)
+
+    def _ablation(self, C):
+        """Drop one member at a time: fit on FIT users, evaluate on SELECT users.
+        Paired bootstrap CI of the per-user NDCG difference vs. all members."""
+        V = self.S["valid"]
+        truth_sel = [t for t, r in zip(V["truth"], self.sel) if r]
+
+        def per_user(members):
+            w = self._fit_lr(self.fit, C, members=members)
+            return ndcg_at_k(self._weighted("valid", w)[self.sel], truth_sel)
+
+        base = per_user(self.members)
+        rng = np.random.default_rng(SEED)
+        idx = rng.integers(0, len(base), (2000, len(base)))
+        rows = [{"removed": "(none)", "select_ndcg@10": base.mean(), "delta": 0.0,
+                 "delta_ci_low": 0.0, "delta_ci_high": 0.0}]
+        for m in self.members:
+            d = per_user([x for x in self.members if x != m]) - base
+            boots = d[idx].mean(1)
+            rows.append({"removed": m, "select_ndcg@10": base.mean() + d.mean(), "delta": d.mean(),
+                         "delta_ci_low": np.quantile(boots, 0.025),
+                         "delta_ci_high": np.quantile(boots, 0.975)})
+            print(f"  without {m}: delta NDCG@10={d.mean():+.4f}")
+        pd.DataFrame(rows).round(4).to_csv(HOUT / "Weighted_ablation.csv", index=False)
 
     def weighted(self):
         V, rows = self.S["valid"], []
@@ -183,44 +288,92 @@ class Hybrids:
         sample = np.stack([V["norm"][m][keep] for m in self.members], axis=1)
         pd.DataFrame(np.corrcoef(sample.T), index=self.members,
                      columns=self.members).round(3).to_csv(HOUT / "Weighted_score_correlation.csv")
+        print("  coefficient stability (bootstrap)...", flush=True)
+        self._coefficient_stability(C, w)
+        print("  drop-one-member ablation...", flush=True)
+        self._ablation(C)
         return {"C": C, "weights": w}, self._weighted("valid", w), self._weighted("test", w)
 
     # ---------------------------------------------------------------- switching
     @staticmethod
-    def _groups(counts, edges):
-        return np.digitize(counts, edges[1:-1], right=True)
+    def _groups(values, edges):
+        return np.digitize(values, edges[1:-1], right=True)
 
-    def _switch(self, split, edges, choice):
+    def _switch(self, split, crit, edges, choice):
         D = self.S[split]
-        g = self._groups(D["counts"], edges)
+        g = self._groups(D["crit"][crit], edges)
         out = D["scores"][self.rank[0]].copy()  # fallback for empty groups
         for k, m in choice.items():
             out[g == k] = D["scores"][m][g == k]
         return out
 
-    def switching(self):
-        V, rows = self.S["valid"], []
-        for n in [2, 3, 4, 5]:
-            edges = np.quantile(V["counts"], np.linspace(0, 1, n + 1))
-            g = self._groups(V["counts"], edges)
-            choice = {k: max(self.members, key=lambda m: self.per_model_v[m][self.fit & (g == k)].mean())
-                      for k in range(n) if (self.fit & (g == k)).any()}
-            s = mean_ndcg(self._switch("valid", edges, choice), V["truth"], self.sel)
-            rows.append({"n_groups": n, "select_ndcg@10": s, "assignment": str(choice)})
-            print(f"  groups={n}: select NDCG@10={s:.4f} {choice}")
-        n = int(self.save_tuning("Switching", rows, "select_ndcg@10").iloc[0]["n_groups"])
+    def _choose(self, rows):
+        """Member for a group of validation users (boolean mask `rows`).
+        Default = the best member overall. Switch to another member only if it
+        is better on this group with a 95% paired bootstrap CI above zero;
+        otherwise near-ties (noise) would decide the assignment.
+        Returns (member, lower CI bound of its gain over the default)."""
+        default = self.rank[0]
+        best = max(self.members, key=lambda m: self.per_model_v[m][rows].mean())
+        if best == default:
+            return default, 0.0
+        d = self.per_model_v[best][rows] - self.per_model_v[default][rows]
+        rng = np.random.default_rng(SEED)
+        lo = float(np.quantile(d[rng.integers(0, len(d), (2000, len(d)))].mean(1), 0.025))
+        return (best if lo > 0 else default), lo
 
-        edges = np.quantile(V["counts"], np.linspace(0, 1, n + 1))
-        g = self._groups(V["counts"], edges)
-        table = pd.DataFrame({m: [self.per_model_v[m][g == k].mean() for k in range(n)]
-                              for m in self.members})
-        choice = {k: (str(table.loc[k].idxmax()) if (g == k).any() else self.rank[0]) for k in range(n)}
-        table.insert(0, "train_interactions", [f"{int(edges[k])}-{int(edges[k + 1])}" for k in range(n)])
+    def _group_table(self, crit, n):
+        V = self.S["valid"]
+        vals = V["crit"][crit]
+        edges = np.quantile(vals, np.linspace(0, 1, n + 1))
+        g = self._groups(vals, edges)
+        table = pd.DataFrame({m: [self.per_model_v[m][g == k].mean() if (g == k).any() else np.nan
+                                  for k in range(n)] for m in self.members})
+        table.insert(0, "range", [f"{edges[k]:.2f}-{edges[k + 1]:.2f}" for k in range(n)])
         table.insert(1, "n_users", [int((g == k).sum()) for k in range(n)])
-        table["chosen"] = [choice[k] for k in range(n)]
+        table["best"] = table[self.members].idxmax(axis=1)
+        table["margin_over_2nd"] = table[self.members].apply(
+            lambda r: r.nlargest(2).iloc[0] - r.nlargest(2).iloc[-1], axis=1)
+        guarded = [self._choose(g == k) if (g == k).any() else (self.rank[0], 0.0)
+                   for k in range(n)]
+        table["gain_ci_low_vs_default"] = [lo for _, lo in guarded]
+        table["chosen"] = [m for m, _ in guarded]
+        return edges, g, table
+
+    def switching(self):
+        V, rows, groups_all = self.S["valid"], [], []
+        for crit in SWITCH_CRITERIA:
+            vals = V["crit"][crit]
+            for n in [2, 3, 4, 5]:
+                edges = np.quantile(vals, np.linspace(0, 1, n + 1))
+                g = self._groups(vals, edges)
+                choice = {k: self._choose(self.fit & (g == k))[0]
+                          for k in range(n) if (self.fit & (g == k)).any()}
+                s = mean_ndcg(self._switch("valid", crit, edges, choice), V["truth"], self.sel)
+                rows.append({"criterion": crit, "n_groups": n, "select_ndcg@10": s,
+                             "assignment": str(choice),
+                             "switches": len(set(choice.values())) > 1})
+                print(f"  {crit}, groups={n}: select NDCG@10={s:.4f} {choice}")
+                _, _, t = self._group_table(crit, n)
+                t.insert(0, "group", range(n))
+                t.insert(0, "n_groups", n)
+                t.insert(0, "criterion", crit)
+                groups_all.append(t)
+        pd.concat(groups_all).round(4).to_csv(HOUT / "Switching_groups_all.csv", index=False)
+        best = self.save_tuning("Switching", rows, "select_ndcg@10").iloc[0]
+        crit, n = best["criterion"], int(best["n_groups"])
+
+        # refit the assignment on all validation users (same guard)
+        edges, g, table = self._group_table(crit, n)
+        choice = {k: str(table.loc[k, "chosen"]) for k in range(n)}
         table.round(4).to_csv(HOUT / "Switching_assignment.csv", index_label="group")
-        params = {"n_groups": n, "edges": [float(e) for e in edges], "assignment": choice}
-        return params, self._switch("valid", edges, choice), self._switch("test", edges, choice)
+        if len(set(choice.values())) == 1:
+            print(f"  note: no member beats {choice[0]} significantly in any group, so "
+                  f"Switching equals {choice[0]}. See Switching_groups_all.csv.")
+        params = {"criterion": crit, "n_groups": n, "edges": [float(e) for e in edges],
+                  "assignment": choice}
+        return (params, self._switch("valid", crit, edges, choice),
+                self._switch("test", crit, edges, choice))
 
     # ---------------------------------------------------------------- mixed
     def _rrf(self, split, models, c):
@@ -234,7 +387,7 @@ class Hybrids:
     def mixed(self):
         V, rows = self.S["valid"], []
         for n_models in range(2, len(self.rank) + 1):
-            for c in [10, 60, 100]:
+            for c in [1, 5, 10, 30, 60, 100]:
                 ms = self.rank[:n_models]
                 s = mean_ndcg(self._rrf("valid", ms, c), V["truth"])
                 rows.append({"models": "+".join(ms), "n_models": n_models, "c": c, "valid_ndcg@10": s})
@@ -368,7 +521,8 @@ class Hybrids:
         self.fnames = list(self.F)
         V, rows = self.S["valid"], []
         grid = [{"max_iter": it, "learning_rate": lr, "max_leaf_nodes": leaves}
-                for it in [100, 300] for lr in [0.05, 0.1] for leaves in [15, 31]]
+                # extended after the first run: the optimum (300, 0.05, 15) was at the grid edge
+                for it in [300, 600] for lr in [0.02, 0.05, 0.1] for leaves in [7, 15, 31]]
         for params in grid:
             clf = self._fc_fit(self.fit, params)
             s = mean_ndcg(self._fc_score("valid", clf), V["truth"], self.sel)
@@ -395,7 +549,7 @@ class Hybrids:
         V, rows = self.S["valid"], []
         for source in self.rank[:3]:
             for n in [5, 10, 20]:
-                for alpha in [0.25, 0.5, 1.0]:
+                for alpha in [0.1, 0.25, 0.5, 1.0]:  # 0.1 added: 0.25 was at the grid edge
                     full = self._augmented_ease(source, n, alpha)
                     s = mean_ndcg(masked(full[V["users"]], V["mask"]), V["truth"])
                     rows.append({"source": source, "n_pseudo": n, "alpha": alpha, "valid_ndcg@10": s})
@@ -447,17 +601,21 @@ class Hybrids:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--only", nargs="+", choices=HYBRIDS, default=HYBRIDS)
+    p.add_argument("--members", nargs="+", choices=[m for m in MODELS if m != "Random"],
+                   default=DEFAULT_MEMBERS)
     a = p.parse_args()
     clear_cli_args()
     HOUT.mkdir(parents=True, exist_ok=True)
 
     cached = [m for m in MODELS if (ROOT / "cache/scores/test" / f"{m}.npy").exists()]
-    members = [m for m in cached if m != "Random"]
-    missing = [m for m in MODELS if m not in cached]
+    missing = [m for m in a.members if m not in cached]
     if missing:
-        print(f"WARNING: no cached scores for {missing} - run task1/individual.py first. "
-              "Continuing without them.")
-    h = Hybrids(members)
+        sys.exit(f"No cached scores for {missing}. Run: python task1/individual.py "
+                 f"--stage final --models {' '.join(missing)}")
+    if "EASE" not in a.members:
+        print("note: FeatureAugmentation and MetaLevel still use EASE internally")
+    print("hybrid members:", ", ".join(a.members))
+    h = Hybrids(a.members)
 
     methods = {"Weighted": h.weighted, "Switching": h.switching, "Mixed": h.mixed,
                "Cascade": h.cascade, "FeatureCombination": h.feature_combination,
@@ -482,7 +640,7 @@ def main():
     for name in a.only:
         print(f"[{name}]", flush=True)
         params, sv, st = methods[name]()
-        all_params[name] = params
+        all_params[name] = {"members": list(a.members), **params}
         save_yaml(all_params, params_path)
         full = f"Hybrid-{name}"
         export_topk(full, sv, h.S["valid"]["users"], h.dataset, "valid", K_EXPORT, h.config)

@@ -1,0 +1,8 @@
+hybrid,vs,mean_a,mean_b,diff,diff_ci_low,diff_ci_high,p_wilcoxon,p_ttest,users_a_better,users_b_better,p_wilcoxon_holm,significant_0.05
+Weighted,EASE,0.3347,0.3302,0.0045,-0.0014,0.0105,0.1165,0.1424,374,345,0.3495,False
+Switching,EASE,0.3302,0.3302,0.0,0.0,0.0,,1.0,0,0,1.0,False
+Mixed,EASE,0.3316,0.3302,0.0014,-0.0044,0.0072,0.8104,0.6371,343,364,1.0,False
+Cascade,EASE,0.3301,0.3302,-0.0001,-0.0024,0.002,0.0367,0.9179,96,38,0.147,False
+FeatureCombination,EASE,0.2542,0.3302,-0.076,-0.0861,-0.0657,0.0,0.0,208,567,0.0,True
+FeatureAugmentation,EASE,0.3346,0.3302,0.0044,0.0008,0.0083,0.0294,0.0323,317,278,0.147,False
+MetaLevel,EASE,0.2998,0.3302,-0.0304,-0.0383,-0.0222,0.0,0.0,271,468,0.0,True

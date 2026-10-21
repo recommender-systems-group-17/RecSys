@@ -1,0 +1,5 @@
+,EASE,UserKNN,LightGCN,ContentBased
+EASE,1.0,0.534,0.428,0.019
+UserKNN,0.534,1.0,0.329,0.02
+LightGCN,0.428,0.329,1.0,0.02
+ContentBased,0.019,0.02,0.02,1.0
