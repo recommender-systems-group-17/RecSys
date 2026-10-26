@@ -24,7 +24,7 @@ python task3/groups.py            # 3.4        effects per user / item group (--
 
 Outputs go to `outputs/task3/`: `.csv` files with all numbers and `fig_*.png` for the report.
 
-## Rerankers (3.1)
+## Rerankers
 
 All rerankers are greedy post-processors. Each one takes a model's exported **top-100** list with scores min-max normalised per user to [0, 1] (s_i), and builds a new top-10 by repeatedly adding the item that maximises `(1 − λ)·s_i + λ·gain_i`. At λ = 0 you get the original list.
 
@@ -42,7 +42,7 @@ Why these choices:
 - **Why not equalise NDCG between Active and Inactive users** (Li et al., 2021)? A post-processor cannot raise true accuracy for inactive users, so it could only close that gap by lowering it for active users. `UserGap_NDCG` is still reported for every run.
 - **Two new metrics** are added on top of the Task 2 metrics: `PopMiscal` (per user, Abdollahpouri et al., 2021) and `UserGap_PopMiscal`. Both are defined in `common.py`.
 
-## Lambda selection (3.2)
+## Lambda selection
 
 - **Grid:** λ ∈ {0, 0.1, …, 0.9, 0.95, 0.98, 1}. It is finer near 1 because the item- and user-fairness gains are small next to differences in relevance.
 - **Rule:** for each (model, reranker), choose the **largest λ whose validation NDCG@10 is at most 5% below the model without reranking** (`--tolerance`). This means getting as much of the beyond-accuracy objective as possible within an explicit accuracy budget.
@@ -61,9 +61,7 @@ Why these choices:
 - **B (combine, then rerank):** the reranker is applied to the hybrid's top-100.
 - **Positional features:** a reranker changes the order but not the scores, so for both pipelines the hybrid represents each member by its positional score `1 − rank/100`. The logistic-regression weights are fitted on validation with the Task 1.3 recipe and C (`pipeline_weights.csv`). The script prints this positional hybrid's test NDCG@10 next to Hybrid-Weighted's (0.3347) as a check.
 - **How to compare:** λ means different things in A and B, so compare the trade-off curves rather than equal λ values.
-- **ItemFairness in A** counts exposure over the members' full top-100 lists.
-
-## Main observations (for the report)
+- **ItemFairness in A** counts exposure over the members' full top-10 lists.
 
 > **Rerun before using these numbers.** The observations below were written on the earlier Task 1 outputs (10-member hybrid, NeuMF as a base model). Update every number after `bash run_task3.sh`, and check each claim against `selected_ci.csv` (is the change outside its CI?) and `itemfair_order_effect.csv`.
 
