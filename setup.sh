@@ -4,5 +4,5 @@ eval "$(conda shell.bash hook)"
 conda create -n recsys python=3.10 -y
 conda activate recsys
 pip install -e .
-pip install "numpy<2" "ray[tune]"
+pip install "numpy<2" "ray[tune]" matplotlib
 python -c "import recbole; print('RecBole', recbole.__version__, 'installed OK')"
