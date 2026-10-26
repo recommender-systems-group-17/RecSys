@@ -157,6 +157,6 @@ def amortised_exposure(cands, lam, k=K, seed=SEED):
         pen = np.array([shown.get(i, 0) for i in items]) / max(n, 1)
         top = np.argsort(-((1 - lam) * s - lam * pen), kind="stable")[:k]
         out[u] = [items[j] for j in top]
-        for i in out[u]:
+        for i in out[u][:K]:
             shown[i] = shown.get(i, 0) + 1
     return out
